@@ -1,0 +1,7 @@
+Flask
+Pillow
+pyheif
+requests
+pytz
+gunicorn
+ffmpeg-python
