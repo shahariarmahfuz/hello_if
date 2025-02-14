@@ -383,7 +383,7 @@ def check_disk_usage():
         return render_template('ch.html', error=str(e))
 
 def keep_alive():
-    url = "https://naruto-uploader.onrender.com/ping"
+    url = "https://hello-if.onrender.com/ping"
     while True:
         time.sleep(300)
         try:
