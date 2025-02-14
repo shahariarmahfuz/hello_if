@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ডিস্ক ব্যবহার</title>
+    <style>
+        .progress-bar {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress {
+            height: 30px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 30px;
+            color: white;
+            transition: width 0.3s ease;
+        }
+        .stats {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .error {
+            color: red;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ডিস্ক ব্যবহার পরিসংখ্যান</h1>
+    
+    {% if error %}
+        <div class="error">
+            <h3>ত্রুটি:</h3>
+            <p>{{ error }}</p>
+        </div>
+    {% else %}
+        <div class="stats">
+            <h2>Render 2GB কোটা</h2>
+            <p>মোট স্থান: {{ "%.2f"|format(render_quota) }} GB</p>
+            <p>ব্যবহৃত: {{ "%.2f"|format(render_used) }} GB</p>
+            <p>অবশিষ্ট: {{ "%.2f"|format(render_free) }} GB</p>
+            
+            <div class="progress-bar">
+                <div class="progress" style="width: {{ render_percent|round(1) }}%">
+                    {{ render_percent|round(1) }}%
+                </div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <h2>সিস্টেম ডিস্ক তথ্য</h2>
+            <p>মোট স্থান: {{ "%.2f"|format(system_total) }} GB</p>
+            <p>ব্যবহৃত: {{ "%.2f"|format(system_used) }} GB ({{ system_percent }}%)</p>
+            <p>অবশিষ্ট: {{ "%.2f"|format(system_free) }} GB</p>
+        </div>
+    {% endif %}
+
+    <p><a href="/">ফিরে যান</a></p>
+</body>
+</html>
