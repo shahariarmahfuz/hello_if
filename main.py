@@ -166,7 +166,7 @@ def get_links_html():
 @app.route('/delete/<string:link_id>', methods=['POST'])
 def delete_link(link_id):
     links = load_links()
-    link_to_delete = next((link for link in links if link['id'] == link_id), None
+    link_to_delete = next((link for link in links if link['id'] == link_id), None)
     
     if not link_to_delete:
         flash('Link not found!', 'error')
