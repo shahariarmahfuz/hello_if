@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uploaded File Links</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="shortcut icon" href="https://i.postimg.cc/sX93H6sg/android-icon-144x144.png" type="image/png">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 10px;
+            background-color: #f0f2f5;
+        }
+        .link-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .link-box {
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            gap: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .link-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .link-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .link-box a {
+            text-decoration: none;
+            color: #1877f2;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+        .view-btn, .copy-btn, .delete-btn {
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 8px;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        .view-btn {
+            color: #00c851;
+        }
+        .copy-btn {
+            color: #1877f2;
+        }
+        .delete-btn {
+            color: #ff4444;
+        }
+        .view-btn:hover {
+            background-color: #e6f7ec;
+            border-radius: 5px;
+        }
+        .copy-btn:hover {
+            background-color: #f0f2f5;
+            border-radius: 5px;
+        }
+        .delete-btn:hover {
+            background-color: #ffe6e6;
+            border-radius: 5px;
+        }
+        .info {
+            font-size: 12px;
+            color: #65676b;
+            margin-top: 4px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .info i {
+            margin-right: 4px;
+            width: 14px;
+            text-align: center;
+        }
+        .pagination {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+        }
+        .pagination a {
+            color: #1877f2;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        .pagination a:hover {
+            background: #f0f2f5;
+        }
+        .copy-message {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 5px;
+            font-size: 14px;
+            display: none;
+            animation: fadeInOut 3s ease-in-out;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        @media (max-width: 480px) {
+            .link-box {
+                padding: 10px;
+            }
+            .link-box a {
+                font-size: 13px;
+            }
+            .info {
+                font-size: 11px;
+            }
+            .view-btn, .copy-btn, .delete-btn {
+                font-size: 14px;
+                padding: 6px;
+            }
+        }
+
+        .confirm-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .confirm-content {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+
+        .confirm-content h3 {
+            margin: 0 0 15px 0;
+            color: #1c1e21;
+            font-size: 20px;
+        }
+
+        .confirm-content p {
+            color: #606770;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        .confirm-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .confirm-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .confirm-cancel {
+            background: #e4e6eb;
+            color: #1c1e21;
+        }
+
+        .confirm-cancel:hover {
+            background: #d8dadf;
+        }
+
+        .confirm-delete {
+            background: #ff4444;
+            color: white;
+        }
+
+        .confirm-delete:hover {
+            background: #cc0000;
+        }
+    </style>
+</head>
+<body>
+    <h2 style="text-align: center; color: #1c1e21; margin-bottom: 20px;">Uploaded File Links</h2>
+    <div class="link-container">
+        {% for link in links %}
+        <div class="link-box">
+            <div class="link-content">
+                <a href="{{ link.url }}" target="_blank">{{ link.url.split('/uploads')[1] }}</a>
+                <div class="info">
+                    <span>
+                        <i class="fas fa-clock"></i>
+                        {{ link.time }}
+                    </span>
+                </div>
+            </div>
+            <button class="view-btn" onclick="window.open('{{ link.url }}', '_blank')">
+                <i class="fas fa-eye"></i>
+            </button>
+            <button class="copy-btn" id="copyBtn{{ link.id }}" onclick="copyToClipboard('{{ link.url }}', '{{ link.id }}')">
+                <i class="far fa-copy"></i>
+            </button>
+            <button class="delete-btn" onclick="confirmDelete('{{ link.id }}')">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="pagination">
+        {% if prev_page %}
+            <a href="{{ url_for('get_links_html', page=prev_page) }}">
+                <i class="fas fa-chevron-left"></i>
+                Previous
+            </a>
+        {% endif %}
+        {% if next_page %}
+            <a href="{{ url_for('get_links_html', page=next_page) }}">
+                Next
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="copy-message" id="copyMessage">Link copied!</div>
+
+    <div class="confirm-modal" id="confirmModal">
+        <div class="confirm-content">
+            <h3>Delete File</h3>
+            <p>Are you sure you want to delete this file?</p>
+            <div class="confirm-buttons">
+                <button class="confirm-cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button class="confirm-delete" onclick="proceedDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div id="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <script>
+        function copyToClipboard(text, id) {
+            navigator.clipboard.writeText(text).then(() => {
+                let copyBtn = document.getElementById(`copyBtn${id}`);
+                copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                copyBtn.disabled = true;
+                setTimeout(() => {
+                    copyBtn.innerHTML = '<i class="far fa-copy"></i>';
+                    copyBtn.disabled = false;
+                }, 3000);
+            });
+        }
+
+        let deleteId = null;
+
+        function confirmDelete(id) {
+            deleteId = id;
+            const modal = document.getElementById('confirmModal');
+            modal.style.display = 'flex';
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.style.display = 'none';
+            deleteId = null;
+        }
+
+        function proceedDelete() {
+            if (!deleteId) return;
+            
+            fetch(`/delete/${deleteId}`, {
+                method: 'POST',
+            }).then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                }
+            });
+            
+            closeConfirmModal();
+        }
+
+        document.getElementById('confirmModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeConfirmModal();
+            }
+        });
+
+        setTimeout(() => {
+            let flashMessages = document.getElementById('flash-messages');
+            if (flashMessages) {
+                flashMessages.style.display = 'none';
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
