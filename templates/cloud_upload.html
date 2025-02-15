@@ -93,30 +93,22 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">
-                    {{ message|safe }}
-                    {% if category == 'success' %}
-                        {% set link = message.split('href="')[1].split('"')[0] %}
-                        {% if 'HQ' in message %}
-                            <div class="link-container hq-link">
-                                <strong>High Quality:</strong>
-                                <a href="{{ link }}" target="_blank">{{ link }}</a>
-                                <button class="copy-button" onclick="copyToClipboard('{{ link }}')">Copy</button>
-                            </div>
-                        {% elif 'LQ' in message %}
-                            <div class="link-container lq-link">
-                                <strong>Low Quality:</strong>
-                                <a href="{{ link }}" target="_blank">{{ link }}</a>
-                                <button class="copy-button" onclick="copyToClipboard('{{ link }}')">Copy</button>
-                            </div>
-                        {% else %}
-                            <div class="link-container">
-                                <a href="{{ link }}" target="_blank">{{ link }}</a>
-                                <button class="copy-button" onclick="copyToClipboard('{{ link }}')">Copy</button>
-                            </div>
-                        {% endif %}
-                    {% endif %}
-                </div>
+                {% if category == 'fb_success' %}
+                    {% set parts = message.split(':', 1) %}
+                    {% set quality = parts[0] %}
+                    {% set link = parts[1] %}
+                    <div class="alert alert-success">
+                        <div class="link-container {% if quality == 'HD' %}hq-link{% else %}lq-link{% endif %}">
+                            <strong>{{ quality }} Quality:</strong>
+                            <a href="{{ link }}" target="_blank">{{ link }}</a>
+                            <button class="copy-button" onclick="copyToClipboard('{{ link }}')">Copy</button>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message|safe }}
+                    </div>
+                {% endif %}
             {% endfor %}
         {% endif %}
     {% endwith %}
