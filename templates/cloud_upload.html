@@ -104,6 +104,16 @@
                             <button class="copy-button" onclick="copyToClipboard('{{ link }}')">Copy</button>
                         </div>
                     </div>
+                {% elif category == 'success' %}
+                    {% set parts = message.split(':', 1) %}
+                    {% set link = parts[1] %}
+                    <div class="alert alert-success">
+                        <div class="link-container">
+                            <strong>Your Video Link:</strong>
+                            <a href="{{ link }}" target="_blank">{{ link }}</a>
+                            <button class="copy-button" onclick="copyToClipboard('{{ link }}')">Copy</button>
+                        </div>
+                    </div>
                 {% else %}
                     <div class="alert alert-{{ category }}">
                         {{ message|safe }}
