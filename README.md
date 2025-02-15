@@ -39,5 +39,4 @@ A modern and user-friendly web application for uploading and managing files (ima
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/file-uploader.git
-   cd file-uploader
+   git clone https://github.com/shahariarmahfuz/hello_if.git
