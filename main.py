@@ -40,7 +40,7 @@ def allowed_file(filename):
 
 def generate_unique_id():
     letters = string.ascii_uppercase
-    return '-'.join([''.join(random.choice(letters) for _ in range(4)] for _ in range(3)) + f"-{random.randint(0, 9999):04d}"
+    return '-'.join([''.join(random.choice(letters) for _ in range(4)) for _ in range(3)]) + f"-{random.randint(0, 9999):04d}"
 
 def get_bangladesh_time():
     bd_tz = pytz.timezone("Asia/Dhaka")
