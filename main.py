@@ -207,16 +207,16 @@ def cloud_upload():
             return redirect(url_for('cloud_upload'))
 
         try:
-            # Facebook URL হ্যান্ডেল
+            # Facebook URL handling
             if 'facebook.com' in url:
-                # RapidAPI কনফিগারেশন
+                # RapidAPI configuration
                 api_url = 'https://facebook-reel-and-video-downloader.p.rapidapi.com/app/main.php'
                 headers = {
                     'x-rapidapi-host': 'facebook-reel-and-video-downloader.p.rapidapi.com',
                     'x-rapidapi-key': 'c61861f807msha2b1fca42798121p1ff20ajsn067d90ecc3c2'
                 }
                 
-                # API রিকুয়েস্ট
+                # API request
                 response = requests.get(api_url, headers=headers, params={'url': url})
                 response.raise_for_status()
                 data = response.json()
@@ -225,12 +225,12 @@ def cloud_upload():
                     flash('Failed to fetch Facebook video links', 'error')
                     return redirect(url_for('cloud_upload'))
 
-                # HD এবং SD লিংক এক্সট্রাক্ট
+                # Extract HD and SD links
                 hd_url = data.get('links', {}).get('Download High Quality')
                 sd_url = data.get('links', {}).get('Download Low Quality')
                 uploaded_links = []
 
-                # ভিডিও ডাউনলোড ও সেভ
+                # Download and save videos
                 for quality, video_url in [('HD', hd_url), ('SD', sd_url)]:
                     if not video_url:
                         continue
@@ -239,7 +239,7 @@ def cloud_upload():
                     filename = f"{unique_id}.mp4"
                     file_path = os.path.join(app.config['UPLOAD_FOLDER_VIDEOS'], filename)
 
-                    # ভিডিও ডাউনলোড
+                    # Download video
                     video_response = requests.get(video_url, stream=True)
                     video_response.raise_for_status()
                     with open(file_path, 'wb') as f:
@@ -247,10 +247,10 @@ def cloud_upload():
                             if chunk:
                                 f.write(chunk)
 
-                    # লিংক জেনারেট
+                    # Generate link
                     file_url = url_for('serve_file', folder='videos', filename=filename, _external=True)
                     
-                    # ডেটাবেসে এন্ট্রি
+                    # Save to database
                     links = load_links()
                     links.insert(0, {
                         "url": file_url,
@@ -261,15 +261,16 @@ def cloud_upload():
                         "quality": quality
                     })
                     save_links(links)
-                    uploaded_links.append(f'<a href="{file_url}">{quality} Quality</a>')
+                    uploaded_links.append(f'{quality}:{file_url}')
 
                 if uploaded_links:
-                    flash(f'Facebook video uploaded! {" ".join(uploaded_links)}', 'success')
+                    for link in uploaded_links:
+                        flash(link, 'fb_success')
                 else:
                     flash('No valid video links found', 'error')
                 return redirect(url_for('cloud_upload'))
 
-            # সাধারণ URL হ্যান্ডেলিং
+            # Regular URL handling
             else:
                 filename = url.split('/')[-1].split('?')[0]
                 if '.' not in filename:
@@ -277,6 +278,10 @@ def cloud_upload():
                     return redirect(url_for('cloud_upload'))
 
                 ext = filename.rsplit('.', 1)[1].lower()
+                if ext == 'heic':
+                    flash('HEIC files are not allowed via cloud upload', 'error')
+                    return redirect(url_for('cloud_upload'))
+
                 if ext not in app.config['ALLOWED_EXTENSIONS_VIDEO'] | app.config['ALLOWED_EXTENSIONS_IMAGE']:
                     flash('File type not allowed', 'error')
                     return redirect(url_for('cloud_upload'))
@@ -296,36 +301,12 @@ def cloud_upload():
                         if chunk:
                             f.write(chunk)
 
-                # HEIC কনভার্শন
-                if ext == 'heic':
-                    try:
-                        heif_file = pyheif.read(file_path)
-                        image = Image.frombytes(
-                            heif_file.mode,
-                            heif_file.size,
-                            heif_file.data,
-                            "raw",
-                            heif_file.mode,
-                            heif_file.stride,
-                        )
-                        new_filename = f"{unique_id}.jpg"
-                        jpg_path = os.path.join(app.config['UPLOAD_FOLDER_IMAGES'], new_filename)
-                        image.save(jpg_path, "JPEG")
-                        os.remove(file_path)
-                        file_type = 'image'
-                        folder = app.config['UPLOAD_FOLDER_IMAGES']
-                        ext = 'jpg'
-                    except Exception as e:
-                        os.remove(file_path)
-                        flash('HEIC conversion failed', 'error')
-                        return redirect(url_for('cloud_upload'))
-
                 file_url = url_for('serve_file', 
                                  folder=('videos' if file_type == 'video' else 'images'),
                                  filename=new_filename,
                                  _external=True)
 
-                # ডেটাবেসে এন্ট্রি
+                # Save to database
                 links = load_links()
                 links.insert(0, {
                     "url": file_url,
@@ -354,16 +335,16 @@ def check_disk_usage():
         return render_template('ch.html', error="psutil module not installed")
 
     try:
-        # Render-এর 2GB কোটা
+        # Render's 2GB quota
         RENDER_QUOTA_GB = 2.0
         
-        # ডিস্ক ব্যবহারের তথ্য
+        # Disk usage information
         disk = psutil.disk_usage('/')
         used_gb = disk.used / (1024 ** 3)
         free_gb = disk.free / (1024 ** 3)
         percent_used = (used_gb / RENDER_QUOTA_GB) * 100
 
-        # ফাইল সিস্টেমের প্রকৃত তথ্য
+        # System's actual disk information
         system_total_gb = disk.total / (1024 ** 3)
         system_used_gb = disk.used / (1024 ** 3)
         system_free_gb = disk.free / (1024 ** 3)
