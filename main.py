@@ -7,8 +7,6 @@ import json
 import pytz
 from datetime import datetime
 from flask import Flask, render_template, request, send_from_directory, url_for, jsonify, redirect, flash
-from PIL import Image
-import pyheif
 from threading import Thread
 
 app = Flask(__name__)
@@ -21,16 +19,10 @@ app.config['LINKS_FILE'] = 'link.json'
 app.config['ITEMS_PER_PAGE'] = 10
 app.config['PREFERRED_URL_SCHEME'] = 'https'
 app.config['ALLOWED_EXTENSIONS_VIDEO'] = {'mp4', 'avi', 'mov', 'mkv', 'm3u8'}
-app.config['ALLOWED_EXTENSIONS_IMAGE'] = {'jpg', 'jpeg', 'png', 'gif', 'heic'}
+app.config['ALLOWED_EXTENSIONS_IMAGE'] = {'jpg', 'jpeg', 'png', 'gif'}
 
 os.makedirs(app.config['UPLOAD_FOLDER_VIDEOS'], exist_ok=True)
 os.makedirs(app.config['UPLOAD_FOLDER_IMAGES'], exist_ok=True)
-
-# Disk usage check
-try:
-    import psutil
-except ImportError:
-    psutil = None
 
 def load_links():
     if os.path.exists(app.config['LINKS_FILE']):
@@ -48,7 +40,7 @@ def allowed_file(filename):
 
 def generate_unique_id():
     letters = string.ascii_uppercase
-    return '-'.join([''.join(random.choice(letters) for _ in range(4)) for _ in range(3)]) + f"-{random.randint(0, 9999):04d}"
+    return '-'.join([''.join(random.choice(letters) for _ in range(4)] for _ in range(3)) + f"-{random.randint(0, 9999):04d}"
 
 def get_bangladesh_time():
     bd_tz = pytz.timezone("Asia/Dhaka")
@@ -67,26 +59,9 @@ def process_file_upload(file, client_ip):
         new_filename = f"{unique_id}.{ext}"
         upload_time = get_bangladesh_time()
 
-        if ext == 'heic':
-            try:
-                heif_file = pyheif.read(file.stream)
-                image = Image.frombytes(
-                    heif_file.mode,
-                    heif_file.size,
-                    heif_file.data,
-                    "raw",
-                    heif_file.mode,
-                    heif_file.stride,
-                )
-                new_filename = f"{unique_id}.jpg"
-                image.save(os.path.join(app.config['UPLOAD_FOLDER_IMAGES'], new_filename), "JPEG")
-                file_type = 'image'
-            except Exception as e:
-                return {'error': f'HEIC conversion failed: {str(e)}'}
-        else:
-            file_type = 'video' if ext in app.config['ALLOWED_EXTENSIONS_VIDEO'] else 'image'
-            folder = app.config['UPLOAD_FOLDER_VIDEOS'] if file_type == 'video' else app.config['UPLOAD_FOLDER_IMAGES']
-            file.save(os.path.join(folder, new_filename))
+        file_type = 'video' if ext in app.config['ALLOWED_EXTENSIONS_VIDEO'] else 'image'
+        folder = app.config['UPLOAD_FOLDER_VIDEOS'] if file_type == 'video' else app.config['UPLOAD_FOLDER_IMAGES']
+        file.save(os.path.join(folder, new_filename))
 
         file_url = url_for(
             'serve_file',
@@ -278,10 +253,6 @@ def cloud_upload():
                     return redirect(url_for('cloud_upload'))
 
                 ext = filename.rsplit('.', 1)[1].lower()
-                if ext == 'heic':
-                    flash('HEIC files are not allowed via cloud upload', 'error')
-                    return redirect(url_for('cloud_upload'))
-
                 if ext not in app.config['ALLOWED_EXTENSIONS_VIDEO'] | app.config['ALLOWED_EXTENSIONS_IMAGE']:
                     flash('File type not allowed', 'error')
                     return redirect(url_for('cloud_upload'))
@@ -317,7 +288,7 @@ def cloud_upload():
                 })
                 save_links(links)
 
-                flash(f'File uploaded successfully! <a href="{file_url}">View File</a>', 'success')
+                flash(f'File:{file_url}', 'success')
                 return redirect(url_for('cloud_upload'))
 
         except requests.exceptions.RequestException as e:
@@ -328,40 +299,6 @@ def cloud_upload():
         return redirect(url_for('cloud_upload'))
     
     return render_template('cloud_upload.html')
-
-@app.route('/ck')
-def check_disk_usage():
-    if not psutil:
-        return render_template('ch.html', error="psutil module not installed")
-
-    try:
-        # Render's 2GB quota
-        RENDER_QUOTA_GB = 2.0
-        
-        # Disk usage information
-        disk = psutil.disk_usage('/')
-        used_gb = disk.used / (1024 ** 3)
-        free_gb = disk.free / (1024 ** 3)
-        percent_used = (used_gb / RENDER_QUOTA_GB) * 100
-
-        # System's actual disk information
-        system_total_gb = disk.total / (1024 ** 3)
-        system_used_gb = disk.used / (1024 ** 3)
-        system_free_gb = disk.free / (1024 ** 3)
-        system_percent = disk.percent
-
-        return render_template('ch.html',
-                            render_quota=RENDER_QUOTA_GB,
-                            render_used=used_gb,
-                            render_free=RENDER_QUOTA_GB - used_gb,
-                            render_percent=percent_used,
-                            system_total=system_total_gb,
-                            system_used=system_used_gb,
-                            system_free=system_free_gb,
-                            system_percent=system_percent)
-
-    except Exception as e:
-        return render_template('ch.html', error=str(e))
 
 def keep_alive():
     url = "https://hello-if.onrender.com/ping"
