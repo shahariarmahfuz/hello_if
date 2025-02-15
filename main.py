@@ -85,48 +85,28 @@ def index():
 @app.route('/upload', methods=['POST'])
 def handle_upload():
     if 'file' not in request.files:
-        flash('No file selected', 'error')
-        return redirect(url_for('index'))
+        return jsonify({'error': 'No file selected'}), 400
 
     file = request.files['file']
     client_ip = request.remote_addr
 
-    if file.filename == '':
-        flash('No file selected', 'error')
-        return redirect(url_for('index'))
+    result = process_file_upload(file, client_ip)
+    if 'error' in result:
+        return jsonify({'error': result['error']}), 400
+    return jsonify({'url': result['url'], 'type': result['type']})
 
-    if not allowed_file(file.filename):
-        flash('Invalid file type', 'error')
-        return redirect(url_for('index'))
+@app.route('/api', methods=['POST'])
+def handle_api_upload():
+    if 'file' not in request.files:
+        return jsonify({'status': 'fail', 'link': None}), 400
 
-    ext = file.filename.rsplit('.', 1)[1].lower()
-    unique_id = generate_unique_id()
-    new_filename = f"{unique_id}.{ext}"
-    upload_time = get_bangladesh_time()
+    file = request.files['file']
+    client_ip = request.remote_addr
 
-    file_type = 'video' if ext in app.config['ALLOWED_EXTENSIONS_VIDEO'] else 'image'
-    folder = app.config['UPLOAD_FOLDER_VIDEOS'] if file_type == 'video' else app.config['UPLOAD_FOLDER_IMAGES']
-    file.save(os.path.join(folder, new_filename))
-
-    file_url = url_for(
-        'serve_file',
-        folder=('videos' if file_type == 'video' else 'images'),
-        filename=new_filename,
-        _external=True
-    )
-
-    links = load_links()
-    links.insert(0, {
-        "url": file_url,
-        "type": file_type,
-        "id": unique_id,
-        "time": upload_time,
-        "ip": client_ip
-    })
-    save_links(links)
-
-    flash(f'File uploaded successfully! <a href="{file_url}">View File</a>', 'success')
-    return redirect(url_for('index'))
+    result = process_file_upload(file, client_ip)
+    if 'error' in result:
+        return jsonify({'status': 'fail', 'link': None}), 400
+    return jsonify({'status': 'success', 'link': result['url']})
 
 @app.route('/uploads/<folder>/<filename>')
 def serve_file(folder, filename):
