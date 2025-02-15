@@ -1,308 +1,384 @@
-import os
-import time
-import requests
-import random
-import string
-import json
-import pytz
-from datetime import datetime
-from flask import Flask, render_template, request, send_from_directory, url_for, jsonify, redirect, flash
-from threading import Thread
-
-app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'
-
-# Configuration
-app.config['UPLOAD_FOLDER_VIDEOS'] = 'uploads/videos'
-app.config['UPLOAD_FOLDER_IMAGES'] = 'uploads/images'
-app.config['LINKS_FILE'] = 'link.json'
-app.config['ITEMS_PER_PAGE'] = 10
-app.config['PREFERRED_URL_SCHEME'] = 'https'
-app.config['ALLOWED_EXTENSIONS_VIDEO'] = {'mp4', 'avi', 'mov', 'mkv', 'm3u8'}
-app.config['ALLOWED_EXTENSIONS_IMAGE'] = {'jpg', 'jpeg', 'png', 'gif'}
-
-os.makedirs(app.config['UPLOAD_FOLDER_VIDEOS'], exist_ok=True)
-os.makedirs(app.config['UPLOAD_FOLDER_IMAGES'], exist_ok=True)
-
-def load_links():
-    if os.path.exists(app.config['LINKS_FILE']):
-        with open(app.config['LINKS_FILE'], 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return []
-
-def save_links(links):
-    with open(app.config['LINKS_FILE'], 'w', encoding='utf-8') as f:
-        json.dump(links, f, indent=4, ensure_ascii=False)
-
-def allowed_file(filename):
-    ext = filename.rsplit('.', 1)[1].lower()
-    return ext in app.config['ALLOWED_EXTENSIONS_VIDEO'] | app.config['ALLOWED_EXTENSIONS_IMAGE']
-
-def generate_unique_id():
-    letters = string.ascii_uppercase
-    return '-'.join([''.join(random.choice(letters) for _ in range(4)) for _ in range(3)]) + f"-{random.randint(0, 9999):04d}"
-
-def get_bangladesh_time():
-    bd_tz = pytz.timezone("Asia/Dhaka")
-    return datetime.now(bd_tz).strftime("%Y-%m-%d %I:%M %p")
-
-def get_folder_size(folder_path):
-    total_size = 0
-    for dirpath, _, filenames in os.walk(folder_path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            total_size += os.path.getsize(fp)
-    return total_size / (1024 * 1024)  # Convert bytes to MB
-
-@app.route('/ck', methods=['GET'])
-def check_disk_usage():
-    try:
-        # Render Quota (2GB or 2048MB)
-        RENDER_QUOTA_MB = 2048
-
-        # Calculate total usage of uploads folder
-        uploads_size = get_folder_size(app.config['UPLOAD_FOLDER_VIDEOS']) + get_folder_size(app.config['UPLOAD_FOLDER_IMAGES'])
-
-        # Calculate available space
-        available_space = RENDER_QUOTA_MB - uploads_size
-
-        # Prepare JSON response
-        response = {
-            "render_quota_mb": RENDER_QUOTA_MB,
-            "usage_mb": round(uploads_size, 2),
-            "available_space_mb": round(available_space, 2)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naruto file upload</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #3b82f6;
+            --error-color: #ef4444;
+            --text-color: #2c3e50;
+            --background-color: #f8fafc;
+            --shadow-color: rgba(0,0,0,0.1);
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 16px;
+        }
+        .container {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 10px 20px var(--shadow-color);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+            overflow: hidden;
+        }
+        h2 {
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+        .upload-area {
+            border: 2px dashed var(--primary-color);
+            padding: 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover {
+            border-color: var(--secondary-color);
+        }
+        .upload-area i {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 0.75rem;
+        }
+        .upload-area span {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        #fileElem {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-info {
+            margin-top: 1rem;
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+        .uploaded-file {
+            margin-top: 1.5rem;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .uploaded-file.visible {
+            max-height: 200px;
+            opacity: 1;
+        }
+        .upload-btn {
+            padding: 12px 24px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 1rem;
+            display: none;
+            width: 100%;
+            max-width: 200px;
+        }
+        .upload-btn:hover {
+            background-color: var(--secondary-color);
+        }
+        .file-link-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 1rem;
+        }
+        .file-link-container input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+        .file-link-container button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            transition: color 0.3s;
+            padding: 8px;
+        }
+        .file-link-container button:hover {
+            color: var(--secondary-color);
+        }
+        .loader {
+            width: 40px;
+            height: 40px;
+            margin: 20px auto;
+            border-radius: 50%;
+            border: 4px solid #e0e0e0;
+            border-top-color: var(--primary-color);
+            animation: spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            display: none;
+        }
+        .status-icon {
+            font-size: 40px;
+            margin: 20px auto;
+            display: none;
+            animation: iconPop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        .checkmark { color: var(--primary-color); }
+        .crossmark { color: var(--error-color); }
+        .upload-message {
+            color: #757575;
+            margin-top: 10px;
+            display: none;
+            font-size: 0.9rem;
         }
 
-        return jsonify(response), 200
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes iconPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        @media (max-width: 480px) {
+            .container {
+                padding: 16px;
+                border-radius: 12px;
+            }
+            h2 {
+                font-size: 1.25rem;
+            }
+            .upload-area {
+                padding: 16px;
+            }
+            .upload-area i {
+                font-size: 2rem;
+            }
+            .upload-area span {
+                font-size: 0.8rem;
+            }
+            .upload-btn {
+                font-size: 0.9rem;
+                padding: 10px 20px;
+            }
+            .file-link-container input {
+                font-size: 0.8rem;
+            }
+            .file-link-container button {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>File Upload</h2>
+    <div class="upload-area" id="uploadArea">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <span>Click to select file</span>
+        <input type="file" id="fileElem">
+    </div>
+    <button class="upload-btn" id="uploadBtn">Upload File</button>
+    <div class="file-info" id="fileInfo"></div>
 
-@app.route('/')
-def index():
-    return render_template('upload.html')
+    <div class="loader" id="loader"></div>
+    <div class="status-icon checkmark" id="checkmark">&#10003;</div>
+    <div class="status-icon crossmark" id="crossmark">&#10005;</div>
+    <div class="upload-message" id="uploadStatus"></div>
 
-@app.route('/upload', methods=['POST'])
-def handle_upload():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file selected'}), 400
+    <div class="uploaded-file" id="uploadedFile">
+        <div class="file-link-container">
+            <input type="text" id="fileLink" readonly>
+            <button id="copyButton" title="Copy URL">
+                <i class="fas fa-copy"></i>
+            </button>
+            <button id="viewButton" title="View File">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+    </div>
+</div>
 
-    file = request.files['file']
-    client_ip = request.remote_addr
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileElem = document.getElementById('fileElem');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadedFile = document.getElementById('uploadedFile');
+    const fileLink = document.getElementById('fileLink');
+    const copyButton = document.getElementById('copyButton');
+    const viewButton = document.getElementById('viewButton');
+    const loader = document.getElementById('loader');
+    const checkmark = document.getElementById('checkmark');
+    const crossmark = document.getElementById('crossmark');
+    const uploadStatus = document.getElementById('uploadStatus');
+    let selectedFile = null;
+    let isCooldown = false;
+    let lastFileHash = null;
+    let cooldownInterval = null;
 
-    result = process_file_upload(file, client_ip)
-    if 'error' in result:
-        return jsonify({'error': result['error']}), 400
-    return jsonify({'url': result['url'], 'type': result['type']})
+    async function calculateFileHash(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    }
 
-@app.route('/api', methods=['POST'])
-def handle_api_upload():
-    if 'file' not in request.files:
-        return jsonify({'status': 'fail', 'link': None}), 400
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' bytes';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
 
-    file = request.files['file']
-    client_ip = request.remote_addr
+    function updateUploadButtonState() {
+        if (selectedFile && !isCooldown) {
+            uploadBtn.disabled = false;
+            uploadBtn.style.display = 'inline-block';
+        } else {
+            uploadBtn.disabled = true;
+            uploadBtn.style.display = selectedFile ? 'inline-block' : 'none';
+        }
+    }
 
-    result = process_file_upload(file, client_ip)
-    if 'error' in result:
-        return jsonify({'status': 'fail', 'link': None}), 400
-    return jsonify({'status': 'success', 'link': result['url']})
+    async function handleFileSelect(file) {
+        if (!file) return;
+        selectedFile = file;
+        const fileHash = await calculateFileHash(file);
 
-@app.route('/uploads/<folder>/<filename>')
-def serve_file(folder, filename):
-    directory = app.config[f'UPLOAD_FOLDER_{folder.upper()}']
-    return send_from_directory(directory, filename)
+        if (fileHash === lastFileHash && isCooldown) {
+            fileInfo.textContent = `Selected File: ${file.name} (${formatFileSize(file.size)}) - Please wait for cooldown`;
+        } else {
+            fileInfo.textContent = `Selected File: ${file.name} (${formatFileSize(file.size)})`;
+            lastFileHash = fileHash;
+            isCooldown = false;
+            if (cooldownInterval) {
+                clearInterval(cooldownInterval);
+                cooldownInterval = null;
+            }
+        }
+        uploadedFile.classList.remove('visible');
+        updateUploadButtonState();
+    }
 
-@app.route('/link', methods=['GET'])
-def get_links_html():
-    page = request.args.get('page', 1, type=int)
-    links = load_links()
+    fileElem.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
 
-    start = (page - 1) * app.config['ITEMS_PER_PAGE']
-    end = start + app.config['ITEMS_PER_PAGE']
-    paginated_links = links[start:end]
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('highlight');
+    });
 
-    next_page = page + 1 if end < len(links) else None
-    prev_page = page - 1 if page > 1 else None
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('highlight');
+    });
 
-    return render_template('links.html', 
-                           links=paginated_links, 
-                           current_page=page, 
-                           next_page=next_page, 
-                           prev_page=prev_page)
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('highlight');
+        handleFileSelect(e.dataTransfer.files[0]);
+    });
 
-@app.route('/delete/<string:link_id>', methods=['POST'])
-def delete_link(link_id):
-    links = load_links()
-    link_to_delete = next((link for link in links if link['id'] == link_id), None)
-    
-    if not link_to_delete:
-        flash('Link not found!', 'error')
-        return redirect(url_for('get_links_html'))
+    uploadBtn.addEventListener('click', async () => {
+        if (!selectedFile || isCooldown) return;
 
-    url_parts = link_to_delete['url'].split('/')
-    filename = url_parts[-1]
-    folder_type = 'VIDEOS' if link_to_delete['type'] == 'video' else 'IMAGES'
-    file_path = os.path.join(app.config[f'UPLOAD_FOLDER_{folder_type}'], filename)
+        loader.style.display = 'block';
+        uploadStatus.style.display = 'block';
+        uploadStatus.textContent = "Uploading...";
+        uploadBtn.disabled = true;
+        checkmark.style.display = 'none';
+        crossmark.style.display = 'none';
 
-    try:
-        os.remove(file_path)
-    except Exception as e:
-        print(f"Error deleting file: {str(e)}")
-        flash('Error deleting file!', 'error')
-        return redirect(url_for('get_links_html'))
+        const formData = new FormData();
+        formData.append('file', selectedFile);
 
-    new_links = [link for link in links if link['id'] != link_id]
-    save_links(new_links)
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
 
-    flash('File deleted successfully!', 'success')
-    return redirect(url_for('get_links_html'))
+            loader.style.display = 'none';
+            checkmark.style.display = 'block';
+            uploadStatus.textContent = "Upload Complete!";
+            isCooldown = true;
+            updateUploadButtonState();
 
-@app.route('/ping', methods=['GET'])
-def ping():
-    return jsonify({"status": "alive"})
+            setTimeout(() => {
+                checkmark.style.display = 'none';
+                uploadedFile.classList.add('visible');
+                fileLink.value = data.url;
+                viewButton.onclick = () => window.open(data.url, '_blank');
 
-@app.errorhandler(404)
-def page_not_found(error):
-    return render_template('404.html'), 404
+                let seconds = 30;
+                cooldownInterval = setInterval(() => {
+                    uploadStatus.textContent =  ` You will have to wait ${seconds} seconds to re-upload this photo. But you can upload other photos if you want.`;
+                    seconds--;
+                    if (seconds < 0) {
+                        clearInterval(cooldownInterval);
+                        isCooldown = false;
+                        uploadStatus.style.display = 'none';
+                        updateUploadButtonState();
+                    }
+                }, 1000);
+            }, 1500);
+        } catch (error) {
+            console.error('Error:', error);
+            loader.style.display = 'none';
+            crossmark.style.display = 'block';
+            uploadStatus.textContent = "Upload failed. Please try again";
+            uploadBtn.disabled = false;
+            updateUploadButtonState();
+            
+            setTimeout(() => {
+                crossmark.style.display = 'none';
+                uploadStatus.style.display = 'none';
+            }, 2000);
+        }
+    });
 
-@app.route('/cloud', methods=['GET', 'POST'])
-def cloud_upload():
-    if request.method == 'POST':
-        url = request.form.get('url')
-        if not url:
-            flash('Please provide a valid URL', 'error')
-            return redirect(url_for('cloud_upload'))
-
-        try:
-            # Facebook URL handling
-            if 'facebook.com' in url:
-                # RapidAPI configuration
-                api_url = 'https://facebook-reel-and-video-downloader.p.rapidapi.com/app/main.php'
-                headers = {
-                    'x-rapidapi-host': 'facebook-reel-and-video-downloader.p.rapidapi.com',
-                    'x-rapidapi-key': 'c61861f807msha2b1fca42798121p1ff20ajsn067d90ecc3c2'
-                }
-                
-                # API request
-                response = requests.get(api_url, headers=headers, params={'url': url})
-                response.raise_for_status()
-                data = response.json()
-
-                if not data.get('success'):
-                    flash('Failed to fetch Facebook video links', 'error')
-                    return redirect(url_for('cloud_upload'))
-
-                # Extract HD and SD links
-                hd_url = data.get('links', {}).get('Download High Quality')
-                sd_url = data.get('links', {}).get('Download Low Quality')
-                uploaded_links = []
-
-                # Download and save videos
-                for quality, video_url in [('HD', hd_url), ('SD', sd_url)]:
-                    if not video_url:
-                        continue
-
-                    unique_id = generate_unique_id()
-                    filename = f"{unique_id}.mp4"
-                    file_path = os.path.join(app.config['UPLOAD_FOLDER_VIDEOS'], filename)
-
-                    # Download video
-                    video_response = requests.get(video_url, stream=True)
-                    video_response.raise_for_status()
-                    with open(file_path, 'wb') as f:
-                        for chunk in video_response.iter_content(chunk_size=8192):
-                            if chunk:
-                                f.write(chunk)
-
-                    # Generate link
-                    file_url = url_for('serve_file', folder='videos', filename=filename, _external=True)
-                    
-                    # Save to database
-                    links = load_links()
-                    links.insert(0, {
-                        "url": file_url,
-                        "type": "video",
-                        "id": unique_id,
-                        "time": get_bangladesh_time(),
-                        "ip": request.remote_addr,
-                        "quality": quality
-                    })
-                    save_links(links)
-                    uploaded_links.append(f'{quality}:{file_url}')
-
-                if uploaded_links:
-                    for link in uploaded_links:
-                        flash(link, 'fb_success')
-                else:
-                    flash('No valid video links found', 'error')
-                return redirect(url_for('cloud_upload'))
-
-            # Regular URL handling
-            else:
-                filename = url.split('/')[-1].split('?')[0]
-                if '.' not in filename:
-                    flash('URL must point to a file with extension', 'error')
-                    return redirect(url_for('cloud_upload'))
-
-                ext = filename.rsplit('.', 1)[1].lower()
-                if ext not in app.config['ALLOWED_EXTENSIONS_VIDEO'] | app.config['ALLOWED_EXTENSIONS_IMAGE']:
-                    flash('File type not allowed', 'error')
-                    return redirect(url_for('cloud_upload'))
-
-                response = requests.get(url, stream=True)
-                response.raise_for_status()
-
-                file_type = 'video' if ext in app.config['ALLOWED_EXTENSIONS_VIDEO'] else 'image'
-                folder = app.config['UPLOAD_FOLDER_VIDEOS'] if file_type == 'video' else app.config['UPLOAD_FOLDER_IMAGES']
-                
-                unique_id = generate_unique_id()
-                new_filename = f"{unique_id}.{ext}"
-                file_path = os.path.join(folder, new_filename)
-                
-                with open(file_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-
-                file_url = url_for('serve_file', 
-                                 folder=('videos' if file_type == 'video' else 'images'),
-                                 filename=new_filename,
-                                 _external=True)
-
-                # Save to database
-                links = load_links()
-                links.insert(0, {
-                    "url": file_url,
-                    "type": file_type,
-                    "id": unique_id,
-                    "time": get_bangladesh_time(),
-                    "ip": request.remote_addr
-                })
-                save_links(links)
-
-                flash(f'File:{file_url}', 'success')
-                return redirect(url_for('cloud_upload'))
-
-        except requests.exceptions.RequestException as e:
-            flash(f'Error downloading file: {str(e)}', 'error')
-        except Exception as e:
-            flash(f'An error occurred: {str(e)}', 'error')
-        
-        return redirect(url_for('cloud_upload'))
-    
-    return render_template('cloud_upload.html')
-
-def keep_alive():
-    url = "https://hello-if.onrender.com/ping"
-    while True:
-        time.sleep(300)
-        try:
-            response = requests.get(url)
-            print("✅ Ping successful" if response.status_code == 200 else f"⚠️ Ping failed: {response.status_code}")
-        except Exception as e:
-            print(f"❌ Error: {e}")
-
-if __name__ == '__main__':
-    Thread(target=keep_alive, daemon=True).start()
-    app.run(debug=True, host='0.0.0.0', port=3000)
+    copyButton.addEventListener('click', () => {
+        fileLink.select();
+        navigator.clipboard.writeText(fileLink.value)
+            .then(() => {
+                copyButton.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('Copy failed:', err);
+                copyButton.innerHTML = '<i class="fas fa-times"></i>';
+                setTimeout(() => {
+                    copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                }, 2000);
+            });
+    });
+</script>
+</body>
+</html>
