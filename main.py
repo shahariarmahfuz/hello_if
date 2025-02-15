@@ -46,44 +46,37 @@ def get_bangladesh_time():
     bd_tz = pytz.timezone("Asia/Dhaka")
     return datetime.now(bd_tz).strftime("%Y-%m-%d %I:%M %p")
 
-def process_file_upload(file, client_ip):
+def get_folder_size(folder_path):
+    total_size = 0
+    for dirpath, _, filenames in os.walk(folder_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            total_size += os.path.getsize(fp)
+    return total_size / (1024 * 1024)  # Convert bytes to MB
+
+@app.route('/ck', methods=['GET'])
+def check_disk_usage():
     try:
-        if file.filename == '':
-            return {'error': 'Empty file'}
+        # Render Quota (2GB or 2048MB)
+        RENDER_QUOTA_MB = 2048
 
-        if not allowed_file(file.filename):
-            return {'error': 'Invalid file type'}
+        # Calculate total usage of uploads folder
+        uploads_size = get_folder_size(app.config['UPLOAD_FOLDER_VIDEOS']) + get_folder_size(app.config['UPLOAD_FOLDER_IMAGES'])
 
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        unique_id = generate_unique_id()
-        new_filename = f"{unique_id}.{ext}"
-        upload_time = get_bangladesh_time()
+        # Calculate available space
+        available_space = RENDER_QUOTA_MB - uploads_size
 
-        file_type = 'video' if ext in app.config['ALLOWED_EXTENSIONS_VIDEO'] else 'image'
-        folder = app.config['UPLOAD_FOLDER_VIDEOS'] if file_type == 'video' else app.config['UPLOAD_FOLDER_IMAGES']
-        file.save(os.path.join(folder, new_filename))
+        # Prepare JSON response
+        response = {
+            "render_quota_mb": RENDER_QUOTA_MB,
+            "usage_mb": round(uploads_size, 2),
+            "available_space_mb": round(available_space, 2)
+        }
 
-        file_url = url_for(
-            'serve_file',
-            folder=('videos' if file_type == 'video' else 'images'),
-            filename=new_filename,
-            _external=True
-        )
-
-        links = load_links()
-        links.insert(0, {
-            "url": file_url,
-            "type": file_type,
-            "id": unique_id,
-            "time": upload_time,
-            "ip": client_ip
-        })
-        save_links(links)
-
-        return {'url': file_url, 'type': file_type}
+        return jsonify(response), 200
 
     except Exception as e:
-        return {'error': f'Internal server error: {str(e)}'}
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
 def index():
