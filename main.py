@@ -253,7 +253,7 @@ def ping():
     return jsonify({"status": "alive"})
 
 def keep_alive():
-    url = "https://hello-if-qn39.onrender.com"  # আপনার এপ্লিকেশনের URL দিয়ে পরিবর্তন করুন
+    url = "https://hello-if.onrender.com/ping"  # আপনার এপ্লিকেশনের URL দিয়ে পরিবর্তন করুন
     while True:
         time.sleep(300)  # 5 মিনিট পরপর পিং
         try:
