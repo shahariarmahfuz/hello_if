@@ -186,7 +186,7 @@ def direct_upload():
         if 'facebook.com' in video_url:
             headers = {
                 'x-rapidapi-host': 'facebook-reel-and-video-downloader.p.rapidapi.com',
-                'x-rapidapi-key': '1be027dfcemshff3b8bc39162975p19fa5fjsnab9d1232788d'
+                'x-rapidapi-key': 'a5037965bamsh20965b59564899bp13fff0jsn336df3e8acb4'
             }
             params = {'url': video_url}
             
